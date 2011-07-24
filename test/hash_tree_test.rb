@@ -24,11 +24,11 @@ context("HashTree") do
     end
   end
 
-  context("#insert") do
-    hookup { topic.insert([:foo, :bar, :baz], :bat) }
+  context("#set") do
+    hookup { topic.set([:foo, :bar, :baz], :bat) }
     should("store the last argument") { topic[:foo][:bar][:baz] == :bat }
     context("with an empty signature") do
-      should { topic.insert([], :smurf) }.raises(ArgumentError)
+      should { topic.set([], :smurf) }.raises(ArgumentError)
     end
   end
 
@@ -44,49 +44,103 @@ context("HashTree") do
     should("work on subtree paths") { topic.find(:a, :b).class == HashTree }
   end
 
-  context("#match_keys") do
-    context("on true") do
-      should("return all keys") do
-        topic.match_keys(true, [false, 1, :one, "one"]) == [false, 1, :one, "one"]
+  context("#traverse") do
+    context("with no arguments") do
+      setup do
+        topic[:a][:b][:c] = :d
+        topic[:a][:b][:e] = :f
+        topic[1][2][3] = 4 
+        out = []
+        topic.traverse do |n|
+          out << n
+        end
+        #pp out
+        out
+      end
+      should("visit every node once") do
+        topic.size == 5
+        #topic == [[1, :a], [2], [:b], [3], [:e, :c], 4, :f, :d]
       end
     end
-    context("on regex") do
-      should("return keys that match the regex") do
-        topic.match_keys(/bc/, %w[abcd foo]) == %w[abcd]
+  end
+
+  context("#match?") do
+    context("true") do
+      asserts("always matches") do
+        [1, :one, "one", false, nil, true].all? do |k|
+          topic.match?(true, k)
+        end
       end
     end
-    context("on proc") do
+
+    context("regex") do
+      setup do
+        [:foo, "food", nil, true, false].select do |k|
+          topic.match?(/foo/, k)
+        end
+      end
+      asserts("matches where the regex would") do
+        topic == ["food"]
+      end
+    end
+
+    context("proc") do
       helper :integer_test do
         lambda { |key| key.is_a? Integer }
       end
-      should("return keys for which proc returns truthy") do
-        topic.match_keys(integer_test, [1, :one, "one"]) == [1]
+      setup do
+        [1, :one, "one"].select do |k|
+          topic.match?(integer_test, k)
+        end
+      end
+      asserts("matches if proc return value is true") do
+        topic == [1]
       end
     end
-    context("on symbol") do
-      should("return keys which are the symbol") do
-        topic.match_keys(:monkey, [:dog, :cat, :smurf, :monkey]) == [:monkey]
+
+    context("symbol") do
+      asserts("matches exact symbol") do
+        out = ["one", :one, :onerous, 1].select do |k|
+          topic.match?(:one, k)
+        end
+        out == [:one]
       end
     end
-    context("on string") do
-      should("return keys which are the string") do
-        topic.match_keys("monkey", ["ape", "monkey"]) == ["monkey"]
+
+    context("string") do
+      asserts("matches exact string") do
+        out = ["one", :one, "onerous", 1].select do |k|
+          topic.match?("one", k)
+        end
+        out == ["one"]
       end
     end
-    context("on anything else") do
+
+    context("unsupported value") do
       should do
-        topic.match_keys({}, [1, 2])
+        topic.match?(Object.new, [1, 2])
       end.raises(ArgumentError, "Unexpected matcher type")
     end
   end
 
-  context("#accumulate") do
-    hookup do
-      topic.accumulate([:a, :b, :c]) {|v| (v||0) + 2 }
-      topic.accumulate([:a, :b, :c]) {|v| (v||0) + 2 }
+  context("#reduce") do
+    context("with no base argument") do
+      hookup do
+        topic.reduce([:a, :b, :c]) {|v| v + 2 }
+        topic.reduce([:a, :b, :c]) {|v| v + 2 }
+      end
+      should("uses a base value of 0") do
+        topic.find(:a, :b, :c) == 4
+      end
     end
-    should("run and accumulate block results on chosen path") do
-      topic.find(:a, :b, :c) == 4
+    context("with a base argument") do
+      hookup do
+        topic.reduce([:a, :b, :c], []) {|v| v << 2 }
+        topic.reduce([:a, :b, :c], []) {|v| v << 3 }
+      end
+      should("use that base") do
+        topic.find(:a, :b, :c) == [2, 3]
+      end
     end
   end
 
@@ -120,25 +174,51 @@ context("HashTree") do
         topic.find(:a, :b, :c) == 26
       end
     end
+    context("return value") do
+      setup do
+        topic.increment([:a, :b, :c])
+        topic.increment([:a, :b, :c])
+        topic.increment([:a, :b, :c])
+      end
+      should("be the the accumulation") { topic == 3 }
+    end
   end
 
-  context("An accumulator") do
-    hookup do
-      a = topic.accumulator([:a, :b, :c], 0) {|acc, v| acc + v }
-      a[1]
-      a[1]
-      a[3]
+  context("#reducer") do
+    context("returns an reducer") do
+      context("which acts on the HashTree") do
+        hookup do
+          a = topic.reducer([:a, :b, :c], 0) {|acc, v| acc + v }
+          a[1]
+          a[3]
+        end
+        should "accumulate a result" do
+          topic.find(:a, :b, :c) == 4
+        end
+      end
+
+      context("which when called") do
+        setup do
+          a = topic.reducer([:a, :b, :c], 0) {|acc, v| acc + v }
+          a[1]
+          a[1]
+          a[3]
+          a
+        end
+        should "return the accumulation" do
+          topic[1] == 6
+        end
+      end
+
     end
-    should "work" do
-      topic.find(:a, :b, :c) == 5
-    end
+
   end
 
   context("#retrieve") do
     hookup do
-      topic.insert([:a, :b, :c], :d)
-      topic.insert(%w[little blue thing], :smurf)
-      topic.insert(%w[little red demon], :imp)
+      topic.set([:a, :b, :c], :d)
+      topic.set(%w[little blue thing], :smurf)
+      topic.set(%w[little red demon], :imp)
       topic[:a][:b][:e] = :f
       topic[1][2][3] = 4
     end
@@ -161,22 +241,15 @@ context("HashTree") do
 
   context("#filter") do
     hookup do
-      topic.insert(%w[a b c d], :one)
-      topic.insert(%w[a b c e], :two)
-      topic.insert(%w[a 1 c 2], :three)
-      topic.insert(%w[x y z], :four)
+      topic.set(%w[a b c d], :one)
+      topic.set(%w[a b c e], :two)
+      topic.set(%w[a 1 c 2], :three)
+      topic.set(%w[x y z], :four)
     end
     should("return values which match") do
       topic.filter("x", "y", "z") == [:four]
     end
     should("return nodes which match the signature") do
-      #topic.filter("a", true, "c") == {
-        #"c" => {
-          #"d" => :one,
-          #"e" => :two,
-          #"2" => :three
-        #}
-      #}
       topic.filter("a", true, "c") == [
         {"d" => :one, "e" => :two},
         {"2" => :three }
