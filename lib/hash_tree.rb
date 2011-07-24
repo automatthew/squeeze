@@ -24,6 +24,8 @@ class HashTree < Hash
     super.replace(hash)
   end
 
+  # Follow or create the path specified by the signature and assign
+  # the value as the terminus.
   # Insert the last arg as a value at the end of the "path"
   # specified by the rest of the args.
   # Ex.
@@ -32,51 +34,66 @@ class HashTree < Hash
   #
   # Individual "path" values may be Strings, Symbols, Regexps, Procs,
   # or Matchers.
-  def insert(*args)
-    ult = args.pop
-    penult = args.pop
+  def insert(sig, val)
+    raise ArgumentError if sig.empty?
+    create_path(sig) do |hash, key|
+      hash[key] = val
+    end
+  end
+
+  def accumulate(sig)
+    create_path(sig) do |hash, key|
+      unless hash.has_key?(key)
+        hash[key] = nil
+      end
+      hash[key] = yield hash[key]
+    end
+  end
+
+  def increment(sig, val=1)
+    val = yield if block_given?
+    create_path(sig) do |hash, key|
+      if hash.has_key?(key)
+        hash[key] = hash[key] + val
+      else
+        hash[key] = val
+      end
+    end
+  end
+
+  # Follow the path specified, creating new nodes where necessary.
+  # Returns the value at the end of the path. If a block is supplied,
+  # it will be called with the last node and the last key as parameters,
+  # analogous to Hash.new's default proc. This is necessary to allow
+  # setting a value at the end of the path.  See the implementation of #insert.
+  def create_path(sig)
+    final_key = sig.pop
+    hash = self
+    sig.each do |a|
+      hash = hash[a]
+    end
+    yield(hash, final_key) if block_given?
+    hash[final_key]
+  end
+
+  # Attempt to retrieve the value at the end of the path specified,
+  # without creating new nodes.  Returns nil on failure.
+  # TODO: consider whether splatting the signature is wise.
+  def find(*sig)
     stage = self
-    args.each do |a|
-      stage = stage[a]
+    sig.each do |a|
+      if stage.has_key?(a)
+        stage = stage[a]
+      else
+        return nil
+      end
     end
-    stage[penult] = ult
+    stage
   end
 
-  def get(*args)
-    ult = args.pop
-    penult = args.pop
-    stage = self
-    args.each do |a|
-      stage = stage[a]
-    end
-    if stage[penult].has_key?(ult)
-      stage[penult][ult]
-    else
-      nil
-    end
-  end
-
-  def accumulate(*args)
-    ult = args.pop
-    penult = args.pop
-    stage = self
-    args.each do |a|
-      stage = stage[a]
-    end
-    unless stage[penult].has_key?(ult)
-      stage[penult][ult] = nil
-    end
-    stage[penult][ult] = yield stage[penult][ult]
-  end
-
-  def increment(*args)
-    accumulate(*args) do |acc|
-      (acc||0) + 1
-    end
-  end
-
-  #a = rh.accumulator([:a, :b, :c], 0) {|acc, v| acc + v }
-  #a[1]
+  # Usage:
+  # a = rh.accumulator([:a, :b, :c], 0) {|acc, v| acc + v }
+  # a[1]
   def accumulator(args, base, &block)
     ult = args.pop
     penult = args.pop
@@ -94,56 +111,6 @@ class HashTree < Hash
     end
   end
 
-  # Given an array of args, attempt to retrieve any values that
-  # can be matched.
-  def retrieve(*args)
-    nodes = [self]
-    results = []
-
-    while !nodes.empty?
-      nxt = []
-      arg = args.shift
-      nodes.each do |node|
-        if node.kind_of?(HashTree)
-          next_keys = matches(arg, node.keys)
-          nxt += node.values_at(*next_keys)
-        else
-          results << node
-        end
-      end
-      nodes = nxt
-    end
-
-    results
-  end
-
-  def filter(*args)
-    nodes = [self]
-    results = []
-
-    while !nodes.empty?
-      nxt = []
-      arg = args.shift
-      nodes.each do |node|
-        if node.kind_of?(HashTree)
-          next_keys = matches(arg, node.keys)
-          n = node.values_at(*next_keys)
-          nxt += n
-          if args.empty?
-            results += nxt
-            if block_given?
-              results.each {|r| yield(r) }
-            end
-            return results
-          end
-        end
-      end
-      nodes = nxt
-    end
-
-    results
-  end
-
   def sum(*args)
     out = 0
     filter(*args) do |v|
@@ -152,30 +119,89 @@ class HashTree < Hash
     out
   end
 
+  def filter(*sig)
+    results = []
+    traverse(*sig) do |node|
+      results << node
+      yield(node) if block_given?
+    end
+    results
+  end
+
+  def traverse(*sig)
+    current_nodes = [self]
+
+    while !current_nodes.empty?
+
+      next_nodes = []
+      current_nodes.each do |node|
+        if sig.empty?
+          yield(node)
+        elsif node.kind_of?(HashTree)
+          next_keys = match_keys(sig.first, node.keys)
+          next_nodes += node.values_at(*next_keys)
+        end
+      end
+      sig.shift
+      current_nodes = next_nodes
+    end
+  end
+
+  def retrieve(*sig)
+    results = []
+    traverse(*sig) do |node|
+      results << node unless node.kind_of?(HashTree)
+    end
+    results
+  end
+
+  # Given an array of args, attempt to retrieve any values that
+  # can be matched.
+  #def retrieve(*args)
+    #current_nodes, results = [self], []
+
+    #while !current_nodes.empty?
+
+      #next_nodes = []
+      #current_nodes.each do |node|
+        #if node.kind_of?(HashTree)
+          #next_keys = match_keys(args.first, node.keys)
+          #next_nodes += node.values_at(*next_keys)
+        #elsif args.empty?
+          #results << node
+        #end
+      #end
+      #args.shift
+      #current_nodes = next_nodes
+    #end
+
+    #results
+  #end
+
   # For a given value (usually one of the args in a #retrieve sequence)
   # and an Array of keys, return an Array of keys that we consider
   # to match the value.
-  def matches(val, keys)
+  def match_keys(val, keys)
     keys.select do |key|
       case val
       when true
         true
       when String, Symbol
         key == val
-        #val == key
       when Regexp
         key =~ val
-        #val =~ key
       when Proc, Matcher
         val.call(key)
-        #key.call(val)
+      when nil
+        false
       else
-        raise "Unexpected matcher type: #{val.inspect}"
+        raise ArgumentError, "Unexpected matcher type: #{val.inspect}"
       end
     end
   end
 
 end
+
 
 # Matchers are initialized with a pattern, to be used for
 # retrieval in a HashTree.  What makes Matcher special,
@@ -202,35 +228,6 @@ class Matcher
   end
 end
 
-
-
-#rh = HashTree.new
-
-#rh.insert(:a, :b, :c, 3)
-#acc = rh.accumulator([:a, :b, :c], 0) {|o, n| o + n }
-#acc[1]
-#acc[1]
-#acc[3]
-
-#rh.accumulate(:a, :b, :c) { |v| (v || 0) + 1 }
-#rh.accumulate(:a, :b, :c) { |v| (v || 0) + 1 }
-#rh.accumulate(:a, :b, :c) { |v| (v || 0) + 1 }
-
-
-#pp rh
-
-#rh.insert(Matcher.new("/smurf"), :get, "application/json", "JSON") 
-#rh.insert(Matcher.new("/smurf"), :get, /html/, "HTML") 
-#rh.insert(Matcher.new("/smurf"), :get, "text/html", "specifically HTML") 
-#rh.insert("/smurf", :get, true, "who cares?") 
-#rh.insert("/smurf", :get, "text/html", "nobody cares?") 
-#rh.insert("/smurf", :post, "application/json", lambda { raise "unimplemented" }) 
-
-#pp rh
-
-#pp rh.retrieve("/smurf", :get, "application/json")
-#pp rh.retrieve("/smurf", :get, "text/html")
-#pp rh.retrieve("/nothing", :get, "text/html")
 
 
 
