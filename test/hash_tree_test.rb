@@ -44,25 +44,23 @@ context("HashTree") do
     should("work on subtree paths") { topic.find(:a, :b).class == HashTree }
   end
 
-  context("#traverse") do
-    context("with no arguments") do
-      setup do
-        topic[:a][:b][:c] = :d
-        topic[:a][:b][:e] = :f
-        topic[1][2][3] = 4 
-        out = []
-        topic.traverse do |n|
-          out << n
-        end
-        #pp out
-        out
-      end
-      should("visit every node once") do
-        topic.size == 5
-        #topic == [[1, :a], [2], [:b], [3], [:e, :c], 4, :f, :d]
-      end
-    end
-  end
+  #context("#traverse") do
+    #context("with no arguments") do
+      #setup do
+        #topic[:a][:b][:c] = :d
+        #topic[:a][:b][:e] = :f
+        #topic[1][2][3] = 4 
+        #out = []
+        #topic.traverse do |n|
+          #out << n
+        #end
+        #out
+      #end
+      #should("visit every node once") do
+        #topic.size == 5
+      #end
+    #end
+  #end
 
   context("#match?") do
     context("true") do
