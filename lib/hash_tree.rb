@@ -15,6 +15,7 @@ class HashTree < Hash
 
   def _dump(depth)
     h = Hash[self]
+    h.delete_if {|k,v| v.is_a? Proc }
     Marshal.dump(h)
   end
 
