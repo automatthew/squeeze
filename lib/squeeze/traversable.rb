@@ -54,7 +54,18 @@ class Squeeze
 
     def sum(*args)
       out = 0
-      filter(*args) { |v| out += v }
+      retrieve(*args) { |v| out += v }
+      out
+    end
+
+    def count(*args)
+      args = args + [:_count]
+      sum(*args)
+    end
+
+    def unique(*args)
+      out = 0
+      filter(*args) { |v| out += v.size }
       out
     end
 
