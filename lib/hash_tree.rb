@@ -13,6 +13,18 @@ class HashTree < Hash
     super.replace(hash)
   end
 
+  def _dump(depth)
+    h = Hash[self]
+    Marshal.dump(h)
+  end
+
+  def self._load(*args)
+    h = Marshal.load(*args)
+    ht = self.new
+    ht.replace(h)
+    ht
+  end
+
   # Follow the path specified, creating new nodes where necessary.
   # Returns the value at the end of the path. If a block is supplied,
   # it will be called with the last node and the last key as parameters,
