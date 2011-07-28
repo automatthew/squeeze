@@ -49,13 +49,15 @@ class Squeeze
   end
 
   def resolve(name, record)
-    if p = @derived[name]
+    if v = record[name]
+      v
+    elsif p = @derived[name]
       p.call(record)
     elsif record.respond_to?(name)
       record.send(name)
     else
-      record[name] || "unknown"
-    end
+      :_unknown
+    end.to_sym
   end
 
 end
