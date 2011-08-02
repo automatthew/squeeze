@@ -13,19 +13,37 @@ module Squeezable
       if options
         @squeeze_spec = options
       else
-        @squeeze_spec || superclass.squeezable
+        @squeeze_spec || superclass.squeezable rescue nil
       end
     end
   end
 
   module InstanceMethods
-    def squeeze
-      meth = self.class.squeezable[:dataset_method]
-      squeezer.reduce(self.send(meth))
+    def squeeze(dataset=nil)
+      unless dataset
+        if meth = self.class.squeezable[:dataset_method]
+          dataset ||= self.send(meth)
+        else
+          raise ArgumentError, "Must give #squeeze a dataset"
+        end
+      end
+      squeezer.reduce(dataset)
     end
 
     def squeezer
       @squeezer ||= Squeeze.new(:fields => self.class.squeezable[:fields])
+    end
+  end
+
+  module Sequel
+    def self.included(mod)
+      mod.module_eval do
+        include Squeezable
+        def_dataset_method(:squeeze) do
+          squeezer = Squeeze.new(:fields => mod.squeezable[:fields])
+          squeezer.reduce(self)
+        end 
+      end
     end
   end
 end
@@ -73,6 +91,7 @@ class Squeeze
     case subfields
     when true
       output.increment(sig + [field, key])
+      output.increment(sig + [field, :_count])
     when Symbol
       output.increment(sig + [field, key, :_count])
       value = resolve(subfields, record)
