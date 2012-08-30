@@ -1,6 +1,8 @@
 require "test/setup"
 require "squeeze/hash_tree"
 
+HashTree = Squeeze::HashTree
+
 #topic = HashTree.new
 #topic.set([:foo, :bar, :baz], :bat)
 #topic.set([:foo, :moo, :soo], :what)

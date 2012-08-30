@@ -1,6 +1,7 @@
 require "test/setup"
 require "squeeze/hash_tree"
 
+HashTree = Squeeze::HashTree
 
 context("HashTree") do
   setup do
@@ -39,9 +40,9 @@ context("HashTree") do
       topic[1][2][3] = 4
     end
 
-    should("return single object when path exists") { topic.find(:a, :b, :e) == :f }
-    should("return nil when path not found") { topic.find(:a, :b, :f) == nil }
-    should("work on subtree paths") { topic.find(:a, :b).class == HashTree }
+    should("return single object when path exists") { topic.find([:a, :b, :e]) == :f }
+    should("return nil when path not found") { topic.find([:a, :b, :f]) == nil }
+    should("work on subtree paths") { topic.find([:a, :b]).class == HashTree }
   end
 
   #context("#traverse") do
@@ -128,7 +129,7 @@ context("HashTree") do
         topic.reduce([:a, :b, :c]) {|v| v + 2 }
       end
       should("uses a base value of 0") do
-        topic.find(:a, :b, :c) == 4
+        topic.find([:a, :b, :c]) == 4
       end
     end
     context("with a base argument") do
@@ -137,7 +138,7 @@ context("HashTree") do
         topic.reduce([:a, :b, :c], []) {|v| v << 3 }
       end
       should("use that base") do
-        topic.find(:a, :b, :c) == [2, 3]
+        topic.find([:a, :b, :c]) == [2, 3]
       end
     end
   end
@@ -150,7 +151,7 @@ context("HashTree") do
         topic.increment([:a, :b, :c])
       end
       should("increment the path terminus by 1") do
-        topic.find(:a, :b, :c) == 3
+        topic.find([:a, :b, :c]) == 3
       end
     end
     context("with a value") do
@@ -160,7 +161,7 @@ context("HashTree") do
         topic.increment([:a, :b, :c], 3)
       end
       should("increment the path terminus by that value") do
-        topic.find(:a, :b, :c) == 6
+        topic.find([:a, :b, :c]) == 6
       end
     end
     context("with a block") do
@@ -169,7 +170,7 @@ context("HashTree") do
         topic.increment([:a, :b, :c]) { 9 }
       end
       should("increment by the value returned by the block") do
-        topic.find(:a, :b, :c) == 26
+        topic.find([:a, :b, :c]) == 26
       end
     end
     context("return value") do
@@ -191,7 +192,7 @@ context("HashTree") do
           a[3]
         end
         should "accumulate a result" do
-          topic.find(:a, :b, :c) == 4
+          topic.find([:a, :b, :c]) == 4
         end
       end
 
@@ -260,4 +261,5 @@ context("HashTree") do
 
 
 end
+
 
