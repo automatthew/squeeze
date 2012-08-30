@@ -1,4 +1,4 @@
-require "hash_tree"
+require "squeeze/hash_tree"
 
 module Squeezable
   def self.included(mod)

@@ -1,4 +1,3 @@
-#require "test/unit"
 require "pp"
 require "rubygems"
 gem "riot"

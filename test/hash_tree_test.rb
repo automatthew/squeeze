@@ -1,5 +1,5 @@
 require "test/setup"
-require "hash_tree"
+require "squeeze/hash_tree"
 
 
 context("HashTree") do
