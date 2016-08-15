@@ -26,7 +26,6 @@ context("Squeeze") do
     s
   end
 
-  # FAILING: apparently I changed the behavior without changing the test.
   asserts("frequency count") do
     {
       :size => {
