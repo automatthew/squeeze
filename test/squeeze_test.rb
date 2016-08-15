@@ -1,4 +1,4 @@
-require "test/setup"
+require_relative "setup"
 require "squeeze"
 
 
@@ -28,15 +28,25 @@ context("Squeeze") do
 
   # FAILING: apparently I changed the behavior without changing the test.
   asserts("frequency count") do
-    pp topic.output
-    topic == {
+    {
       :size => {
-        "small" => 4,
-        "large" => 1,
-        "medium" => 2,
-        "giant" => 1,
-        "tiny" => 1
-      },
+        "small" => {
+          :_count =>4,
+          :color => {"blue" => 1, "gray" => 1, "brown" => 2}
+        },
+        "large" => {
+          :_count =>3,
+          :color => {"charcoal" => 1, "white" => 2}
+        },
+        "medium" => {
+          :_count => 2,
+          :color => {"gray" => 1, "gold" => 1}
+        },
+        "tiny" => {
+          :_count => 1,
+          :color => {"gold" => 1}
+        }
+      }
     }
   end
 
